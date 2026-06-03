@@ -12,3 +12,6 @@ pytest-asyncio
 httpx
 rich
 python-dotenv
+opencv-python-headless
+pytesseract
+Pillow
