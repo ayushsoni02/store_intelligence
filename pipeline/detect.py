@@ -158,7 +158,15 @@ CAMERA_ID_MAP = {
     "CAM 2 - zone.mp4":    "CAM_2_ZONE",
     "CAM 3 - entry.mp4":   "CAM_3_ENTRY",
     "CAM 5 - billing.mp4": "CAM_5_BILLING",
+    "billing_area.mp4":    "CAM_4_BILLING_AREA",
+    "entry 2.mp4":         "CAM_3B_ENTRY",
+    "zone.mp4":            "CAM_0_ZONE",
+    "entry 1.mp4":         "CAM_3C_ENTRY",
 }
+
+ENTRY_CAMERAS   = {"CAM_3_ENTRY", "CAM_3B_ENTRY", "CAM_3C_ENTRY"}
+BILLING_CAMERAS = {"CAM_5_BILLING", "CAM_4_BILLING_AREA"}
+ZONE_CAMERAS    = {"CAM_1_ZONE", "CAM_2_ZONE", "CAM_0_ZONE"}
 
 def extract_frame(video_path: str, frame_idx: int = 0) -> Optional[np.ndarray]:
     """
