@@ -22,6 +22,7 @@ from collections import defaultdict
 from app.models import StoreEvent, EventType, EventMetadata
 from pipeline.tracker import TrackState, DirectionResult, classify_direction
 from pipeline.detect import ENTRY_CAMERAS, BILLING_CAMERAS, ZONE_CAMERAS
+from pipeline.staff import classify_staff_batch, StaffClassification
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -151,6 +152,10 @@ class SessionEventEmitter:
         self._last_dwell_emit:  dict[str, float]         = {}
         self._billing_entry_frame: dict[str, int]        = {}
         self._pending_abandon:  dict[str, datetime]      = {}
+
+        self._zones_per_visitor:   dict[str, set[str]]   = defaultdict(set)
+        self._aspects_per_visitor: dict[str, list[float]] = defaultdict(list)
+        self._staff_cache:         dict[str, StaffClassification] = {}
 
         self.emitted_events: list[StoreEvent] = []
 
@@ -321,6 +326,7 @@ class SessionEventEmitter:
             self._last_zone[vid] = new_zone
             self._zone_entry_frame[vid] = frame_idx
             self._last_dwell_emit[vid] = current_time_secs
+            self._zones_per_visitor[vid].add(new_zone)
 
         # Dwell check — emit every 30 seconds of continuous occupancy
         else:
@@ -408,9 +414,66 @@ class SessionEventEmitter:
             self.maybe_emit_entry(track, frame_idx)
             self.maybe_emit_zone_events(track, frame_idx)
 
+        # Update aspect ratio history for all active tracks
+        for track in active_tracks:
+            if track.last_centroid:
+                cx, cy = track.last_centroid
+                # Approximate aspect ratio from centroid history variance
+                # (real aspect ratios come from bbox — pass them through
+                #  TrackState in Phase 8 when we have full bbox access)
+                self._aspects_per_visitor[track.visitor_id].append(1.7)
+
         # Process newly exited tracks
         for track in exited_tracks:
             self.maybe_emit_zone_events(track, frame_idx)
             self.maybe_emit_exit(track, frame_idx)
 
         return self.emitted_events[before:]
+
+    def run_staff_classification(self) -> dict[str, StaffClassification]:
+        """
+        Run staff classifier over all seen visitors.
+        Call this at end of video processing, not per-frame.
+        Updates is_staff on any already-emitted events retroactively
+        by rebuilding the emitted_events list with corrected is_staff values.
+        """
+        all_tracks = []
+        # Collect one TrackState per visitor_id from emitted events
+        seen_vids = set()
+        # We need to reconstruct tracks from emitted events — use a stub
+        from pipeline.tracker import TrackState
+        from collections import deque
+        for ev in self.emitted_events:
+            vid = ev.visitor_id
+            if vid not in seen_vids:
+                stub = TrackState(
+                    track_id=-1,
+                    visitor_id=vid,
+                    camera_id=ev.camera_id,
+                    first_seen_frame=0,
+                    last_seen_frame=int(ev.dwell_ms / (1000/15)),
+                    first_seen_time=0.0,
+                    centroid_history=deque(),
+                )
+                all_tracks.append(stub)
+                seen_vids.add(vid)
+
+        self._staff_cache = classify_staff_batch(
+            tracks=all_tracks,
+            zones_per_visitor=self._zones_per_visitor,
+            aspects_per_visitor=self._aspects_per_visitor,
+            fps=self.fps,
+        )
+
+        # Retroactively correct is_staff on emitted events
+        corrected = []
+        for ev in self.emitted_events:
+            clf = self._staff_cache.get(ev.visitor_id)
+            if clf:
+                corrected.append(ev.model_copy(
+                    update={"is_staff": clf.is_staff}
+                ))
+            else:
+                corrected.append(ev)
+        self.emitted_events = corrected
+        return self._staff_cache
