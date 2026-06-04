@@ -8,7 +8,7 @@ import glob
 import json
 import argparse
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import Counter
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -31,15 +31,66 @@ def load_pos_timestamps(path="data/raw/pos_transactions.csv") -> list[datetime]:
         with open(path, newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
+                # Handle old schema or new schema
                 ts_str = row.get("timestamp")
+                if not ts_str and "order_date" in row and "order_time" in row:
+                    ts_str = f"{row['order_date']} {row['order_time']}"
+                    try:
+                        # format: 10-04-2026 12:15:05
+                        ts = datetime.strptime(ts_str, "%d-%m-%Y %H:%M:%S")
+                        ts = ts.replace(tzinfo=datetime.now(timezone.utc).tzinfo)
+                        timestamps.append(ts)
+                        continue
+                    except ValueError:
+                        pass
                 if ts_str:
                     try:
-                        # Assumes ISO format e.g. 2026-04-10T12:05:00Z
                         ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                         timestamps.append(ts)
                     except ValueError:
                         pass
     return sorted(timestamps)
+
+def post_process_staff_flags(
+    processed_dir: Path = Path("data/processed")
+) -> dict[str, int]:
+    """
+    Fixes the mid-clip flush bug by ensuring that if a visitor was EVER 
+    classified as staff (in the final flush), ALL their events are retroactively 
+    marked as is_staff=True across the entire JSONL file.
+    """
+    from app.models import StoreEvent
+    import json
+    
+    jsonl_files = sorted(processed_dir.glob("events_*.jsonl"))
+    
+    # Step 1: Find all visitor_ids that have at least one is_staff=True event
+    staff_visitor_ids = set()
+    for f in jsonl_files:
+        for line in f.read_text().splitlines():
+            if not line.strip():
+                continue
+            ev = StoreEvent.model_validate_json(line)
+            if ev.is_staff:
+                staff_visitor_ids.add(ev.visitor_id)
+                
+    # Step 2: Rewrite each JSONL file with corrected is_staff flags
+    corrections_made: dict[str, int] = {}
+    for f in jsonl_files:
+        camera_id   = f.stem.replace("events_", "")
+        lines       = [l for l in f.read_text().splitlines() if l.strip()]
+        corrected   = []
+        n_corrected = 0
+        for line in lines:
+            ev = StoreEvent.model_validate_json(line)
+            if ev.visitor_id in staff_visitor_ids and not ev.is_staff:
+                ev = ev.model_copy(update={"is_staff": True})
+                n_corrected += 1
+            corrected.append(ev.model_dump_json())
+        f.write_text("\n".join(corrected) + "\n")
+        corrections_made[camera_id] = n_corrected
+
+    return corrections_made
 
 def main():
     args = parse_args()
@@ -73,6 +124,11 @@ def main():
         results.append(res)
         
     print("\n" + "="*60)
+    print("Running post-process staff flag correction...")
+    corrections = post_process_staff_flags(Path("data/processed"))
+    total_corrections = sum(corrections.values())
+    print(f"  Corrected is_staff on {total_corrections} events")
+
     print("Merging all events into all_events.jsonl...")
     
     all_events = []
