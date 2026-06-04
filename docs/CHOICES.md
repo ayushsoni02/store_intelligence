@@ -60,3 +60,23 @@ Trade-off documented: SQLite uses a file-level write lock. Even in WAL mode, con
 
 ### Conversion Rate Approximation
 Document the conscious trade-off: `/metrics` uses `min(billing_visitors, txn_count)` as a fast SQL approximation. Full 5-minute window correlation is in `pos_correlator.py` but runs as a batch job, not per-request. This is acceptable for the submission scope as it guarantees sub-10ms response times for the API layer while still providing directionally accurate intelligence.
+
+---
+
+## Decision 4: Live Dashboard — SSE vs WebSockets
+
+### Options Considered
+- Server-Sent Events / SSE (chosen)
+- WebSockets
+- HTTP polling every N seconds
+- React + socket.io
+
+### What AI Suggested
+AI suggested WebSockets for bidirectional real-time communication. For a read-only dashboard, bidirectional capability is unnecessary overhead.
+
+### What We Chose and Why
+SSE via FastAPI StreamingResponse. One-way server→client push is all a metrics dashboard needs. SSE works through proxies without upgrade headers, uses native browser EventSource API (no library), and auto-reconnects built-in. Zero additional dependencies beyond what is already installed.
+
+### Trade-off
+SSE is HTTP/1.1 and subject to 6-connection-per-domain browser limit. WebSockets would be better for >6 concurrent dashboard tabs or for bidirectional control (e.g. sending alert acknowledgements from dashboard to API).
+

@@ -94,6 +94,7 @@ from app.funnel     import router as funnel_router
 from app.heatmap    import router as heatmap_router
 from app.anomalies  import router as anomaly_router
 from app.health     import router as health_router
+from app.streaming  import router as streaming_router
 
 app.include_router(ingest_router)
 app.include_router(metrics_router)
@@ -101,3 +102,4 @@ app.include_router(funnel_router)
 app.include_router(heatmap_router)
 app.include_router(anomaly_router)
 app.include_router(health_router)
+app.include_router(streaming_router)

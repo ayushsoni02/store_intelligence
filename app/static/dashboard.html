@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Store Intelligence — Live Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1117;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #1a1d2e;
+    border-bottom: 1px solid #2d3561;
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  header h1 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #7c83fd;
+    letter-spacing: 0.5px;
+  }
+
+  #status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #444;
+    display: inline-block;
+    margin-right: 8px;
+    transition: background 0.3s;
+  }
+  #status-dot.live  { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+  #status-dot.error { background: #ef4444; }
+
+  #last-updated {
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    padding: 24px 32px 0;
+  }
+
+  .kpi-card {
+    background: #1a1d2e;
+    border: 1px solid #2d3561;
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.3s;
+  }
+  .kpi-card:hover { border-color: #7c83fd; }
+
+  .kpi-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888;
+    margin-bottom: 8px;
+  }
+
+  .kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    transition: color 0.3s;
+  }
+
+  .kpi-value.green  { color: #22c55e; }
+  .kpi-value.yellow { color: #f59e0b; }
+  .kpi-value.red    { color: #ef4444; }
+
+  .kpi-sub {
+    font-size: 0.72rem;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  .charts-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    padding: 16px 32px;
+  }
+
+  .chart-card {
+    background: #1a1d2e;
+    border: 1px solid #2d3561;
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .chart-card h3 {
+    font-size: 0.85rem;
+    color: #aaa;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  canvas { max-height: 220px; }
+
+  .event-dist {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .event-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+  }
+
+  .event-bar-wrap {
+    flex: 1;
+    margin: 0 10px;
+    background: #2d3561;
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .event-bar {
+    height: 100%;
+    border-radius: 4px;
+    background: #7c83fd;
+    transition: width 0.5s ease;
+  }
+
+  .event-count {
+    color: #888;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 0.72rem;
+    color: #444;
+    border-top: 1px solid #1a1d2e;
+    margin-top: 8px;
+  }
+
+  .pulse {
+    animation: pulse 0.4s ease;
+  }
+  @keyframes pulse {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <span id="status-dot"></span>
+    Store Intelligence &mdash; Live Dashboard
+  </h1>
+  <div>
+    <span style="font-size:0.78rem;color:#7c83fd;margin-right:16px">
+      PURPLLE_MUM_1076
+    </span>
+    <span id="last-updated">Connecting...</span>
+  </div>
+</header>
+
+<!-- KPI Cards -->
+<div class="grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Unique Visitors</div>
+    <div class="kpi-value" id="kpi-visitors">&mdash;</div>
+    <div class="kpi-sub">customers (excl. staff)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Conversion Rate</div>
+    <div class="kpi-value" id="kpi-conv">&mdash;</div>
+    <div class="kpi-sub">billing zone reach</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Queue Depth</div>
+    <div class="kpi-value" id="kpi-queue">&mdash;</div>
+    <div class="kpi-sub">billing counter</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Total Events</div>
+    <div class="kpi-value" id="kpi-events">&mdash;</div>
+    <div class="kpi-sub">ingested this session</div>
+  </div>
+</div>
+
+<!-- Charts row -->
+<div class="charts-row">
+
+  <!-- Live visitor count chart -->
+  <div class="chart-card">
+    <h3>Visitor Count &mdash; Live (last 30 updates)</h3>
+    <canvas id="visitorChart"></canvas>
+  </div>
+
+  <!-- Event type distribution -->
+  <div class="chart-card">
+    <h3>Event Distribution</h3>
+    <div class="event-dist" id="event-dist-list">
+      <div style="color:#666;font-size:0.8rem">Waiting for data...</div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Store Intelligence &mdash; Purplle Tech Challenge 2026
+  &nbsp;|&nbsp; SSE stream: /stream/metrics
+  &nbsp;|&nbsp; Refreshing every 3s
+</footer>
+
+<script>
+// ── Chart setup ──────────────────────────────────────────────────────────────
+
+const MAX_POINTS = 30;
+
+const visitorData = {
+  labels:   [],
+  datasets: [{
+    label:           "Unique Visitors",
+    data:            [],
+    borderColor:     "#7c83fd",
+    backgroundColor: "rgba(124,131,253,0.1)",
+    borderWidth:     2,
+    pointRadius:     2,
+    fill:            true,
+    tension:         0.4,
+  }]
+};
+
+const visitorChart = new Chart(
+  document.getElementById("visitorChart"),
+  {
+    type: "line",
+    data: visitorData,
+    options: {
+      responsive:          true,
+      maintainAspectRatio: true,
+      animation:           { duration: 400 },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: "#666", maxTicksLimit: 6 },
+          grid:  { color: "#1f2333" },
+        },
+        y: {
+          ticks:     { color: "#666" },
+          grid:      { color: "#1f2333" },
+          beginAtZero: true,
+        }
+      }
+    }
+  }
+);
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function pulse(id) {
+  const el = document.getElementById(id);
+  el.classList.remove("pulse");
+  void el.offsetWidth;
+  el.classList.add("pulse");
+}
+
+function colorClass(id, value, warnThresh, critThresh) {
+  const el = document.getElementById(id);
+  el.classList.remove("green", "yellow", "red");
+  if (value >= critThresh)      el.classList.add("red");
+  else if (value >= warnThresh) el.classList.add("yellow");
+  else                          el.classList.add("green");
+}
+
+function updateKPI(id, value) {
+  const el = document.getElementById(id);
+  if (el.textContent !== String(value)) {
+    el.textContent = value;
+    pulse(id);
+  }
+}
+
+function updateEventDist(dist) {
+  const container = document.getElementById("event-dist-list");
+  if (!dist || Object.keys(dist).length === 0) return;
+
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  const colors = {
+    ENTRY:                  "#22c55e",
+    EXIT:                   "#ef4444",
+    ZONE_ENTER:             "#7c83fd",
+    ZONE_EXIT:              "#a78bfa",
+    ZONE_DWELL:             "#f59e0b",
+    BILLING_QUEUE_JOIN:     "#fb923c",
+    BILLING_QUEUE_ABANDON:  "#f43f5e",
+    REENTRY:                "#06b6d4",
+  };
+
+  container.innerHTML = Object.entries(dist)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => {
+      const pct   = total > 0 ? (count / total * 100).toFixed(0) : 0;
+      const color = colors[type] || "#888";
+      return `
+        <div class="event-row">
+          <span style="color:${color};min-width:160px">${type}</span>
+          <div class="event-bar-wrap">
+            <div class="event-bar"
+                 style="width:${pct}%;background:${color}"></div>
+          </div>
+          <span class="event-count">${count}</span>
+        </div>`;
+    }).join("");
+}
+
+// ── SSE connection ─────────────────────────────────────────────────────────────
+
+const dot = document.getElementById("status-dot");
+
+function connect() {
+  const es = new EventSource("/stream/metrics");
+
+  es.onopen = () => {
+    dot.className = "live";
+    document.getElementById("last-updated").textContent = "Connected";
+  };
+
+  es.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.error) return;
+
+    const now = new Date().toLocaleTimeString();
+    document.getElementById("last-updated").textContent =
+      `Last update: ${now}`;
+
+    // KPI cards
+    updateKPI("kpi-visitors", d.unique_visitors);
+    updateKPI("kpi-conv",     d.conv_rate_pct + "%");
+    updateKPI("kpi-queue",    d.queue_depth);
+    updateKPI("kpi-events",   d.total_events);
+
+    // Color coding
+    colorClass("kpi-conv",   d.conv_rate_pct,  10, 30);
+    colorClass("kpi-queue",  d.queue_depth,     3,  6);
+    colorClass("kpi-events", d.total_events,    0,  0);
+    document.getElementById("kpi-visitors")
+      .classList.add(d.unique_visitors > 0 ? "green" : "yellow");
+
+    // Live chart
+    visitorData.labels.push(now);
+    visitorData.datasets[0].data.push(d.unique_visitors);
+    if (visitorData.labels.length > MAX_POINTS) {
+      visitorData.labels.shift();
+      visitorData.datasets[0].data.shift();
+    }
+    visitorChart.update();
+
+    // Event distribution bars
+    updateEventDist(d.event_dist);
+  };
+
+  es.onerror = () => {
+    dot.className = "error";
+    document.getElementById("last-updated").textContent =
+      "Connection lost — retrying...";
+    es.close();
+    setTimeout(connect, 5000);   // auto-reconnect after 5s
+  };
+}
+
+connect();
+</script>
+</body>
+</html>

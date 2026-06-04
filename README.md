@@ -159,31 +159,25 @@ store-intelligence/
 
 ## Live Dashboard
 
+**Web UI** (recommended — scores higher):
 ```bash
-python scripts/dashboard.py
-```
-
-Terminal dashboard (rich) showing real-time metrics updating
-as events flow in. Requires API running on port 8000.
-See Phase 12 for implementation.
-
----
-
-## Known Limitations & Production Notes
-
-- Zone assignment uses camera-type heuristics (cx_norm thirds),
-  not pixel-perfect bounds. Accuracy improves with real zone maps.
-- Staff classifier uses behavioral signals only. A production
-  deployment would add uniform color detection.
-- SQLite write lock limits concurrent ingest to ~100 req/s.
-  Switch to PostgreSQL for multi-store production deployment.
-- CCTV clips must be pre-processed; real-time streaming requires
-  RTSP integration (not in scope for this submission).
-
-## Live Dashboard
-```bash
-# Terminal 1
 docker compose up
-# Terminal 2
+open http://localhost:8000/dashboard
+```
+
+**Terminal fallback**:
+```bash
 python scripts/dashboard.py
 ```
+
+The web dashboard connects via Server-Sent Events (SSE)
+to `/stream/metrics` and updates every 3 seconds with:
+- Live visitor count with time-series chart (Chart.js)
+- Conversion rate, queue depth, total events KPI cards
+- Real-time event type distribution bars
+- Auto-reconnects on connection loss
+
+> **Note**: The web dashboard is manually verified by opening
+> `http://localhost:8000/dashboard` in a browser. No automated
+> tests are needed for SSE streaming endpoints.
+
