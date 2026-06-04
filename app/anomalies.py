@@ -41,7 +41,8 @@ async def get_anomalies(
     
     # Only run anomalies if there is data
     if not last_event_ts:
-        return AnomaliesResponse(store_id=store_id, anomalies=[])
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Store {store_id} not found")
         
     if last_event_ts.tzinfo is None:
         last_event_ts = last_event_ts.replace(tzinfo=timezone.utc)

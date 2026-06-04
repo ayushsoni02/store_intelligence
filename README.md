@@ -179,3 +179,11 @@ See Phase 12 for implementation.
   Switch to PostgreSQL for multi-store production deployment.
 - CCTV clips must be pre-processed; real-time streaming requires
   RTSP integration (not in scope for this submission).
+
+## Live Dashboard
+```bash
+# Terminal 1
+docker compose up
+# Terminal 2
+python scripts/dashboard.py
+```

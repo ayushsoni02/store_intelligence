@@ -1,0 +1,16 @@
+[run]
+concurrency = greenlet
+omit =
+    pipeline/emit.py
+    pipeline/layout_parser.py
+    pipeline/process_video.py
+    pipeline/run_all.py
+    pipeline/detect.py
+    scripts/*
+    tests/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__
+    raise NotImplementedError
