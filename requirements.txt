@@ -1,22 +1,24 @@
-fastapi
-uvicorn[standard]
-pydantic>=2.0
+# Core detection pipeline
 ultralytics
 opencv-python-headless
 numpy
 pandas
+pytesseract
+Pillow
+
+# API server
+fastapi
+uvicorn[standard]
+pydantic>=2.0
 sqlalchemy
 aiosqlite
+greenlet
+
+# Utilities
+rich
+python-dotenv
+
+# Testing
 pytest
 pytest-asyncio
 httpx
-rich
-python-dotenv
-opencv-python-headless
-pytesseract
-Pillow
-fastapi
-uvicorn
-aiosqlite
-sqlalchemy
-greenlet

@@ -1,3 +1,22 @@
+
 services:
   api:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: store_intelligence_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount data directory so DB and processed events persist
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped

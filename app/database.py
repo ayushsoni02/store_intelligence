@@ -92,7 +92,7 @@ async def seed_from_jsonl(
     Idempotent: skips if events table already has rows.
     Returns {"events_seeded": N, "pos_seeded": N, "skipped": bool}
     """
-    import pandas as pd
+    import csv
     from app.models import StoreEvent
 
     async with AsyncSessionLocal() as session:
@@ -132,26 +132,35 @@ async def seed_from_jsonl(
         pos_seeded = 0
         pos_file   = Path(pos_path)
         if pos_file.exists():
-            df = pd.read_csv(pos_file)
-            df.columns = df.columns.str.strip()
-            
-            # Handle possible alternate POS schemas
-            if "order_date" in df.columns and "order_time" in df.columns:
-                df["timestamp"] = pd.to_datetime(df["order_date"] + " " + df["order_time"], format="%d-%m-%Y %H:%M:%S", utc=True)
-                df["basket_value_inr"] = df["total_amount"]
-                df["transaction_id"] = df["order_id"]
-            else:
-                df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
-                
-            for _, row in df.iterrows():
-                pos_row = POSRow(
-                    transaction_id   = str(row["transaction_id"]).strip(),
-                    store_id         = str(row["store_id"]).strip(),
-                    timestamp        = row["timestamp"].to_pydatetime(),
-                    basket_value_inr = float(row["basket_value_inr"]),
-                )
-                session.add(pos_row)
-                pos_seeded += 1
+            with open(pos_file, newline="") as f:
+                reader = csv.DictReader(f)
+                # Normalize headers (strip whitespace)
+                reader.fieldnames = [h.strip() for h in reader.fieldnames]
+
+                for raw_row in reader:
+                    raw_row = {k.strip(): v.strip() for k, v in raw_row.items()}
+
+                    # Handle alternate POS schema
+                    if "order_date" in raw_row and "order_time" in raw_row:
+                        ts_str   = f"{raw_row['order_date']} {raw_row['order_time']}"
+                        ts       = datetime.strptime(ts_str, "%d-%m-%Y %H:%M:%S")
+                        txn_id   = raw_row["order_id"]
+                        basket   = float(raw_row["total_amount"])
+                    else:
+                        ts       = datetime.fromisoformat(raw_row["timestamp"])
+                        txn_id   = raw_row["transaction_id"]
+                        basket   = float(raw_row["basket_value_inr"])
+
+                    store_id = raw_row["store_id"]
+
+                    pos_row = POSRow(
+                        transaction_id   = str(txn_id),
+                        store_id         = str(store_id),
+                        timestamp        = ts,
+                        basket_value_inr = basket,
+                    )
+                    session.add(pos_row)
+                    pos_seeded += 1
 
         await session.commit()
         return {
@@ -159,3 +168,4 @@ async def seed_from_jsonl(
             "pos_seeded":    pos_seeded,
             "skipped":       False,
         }
+

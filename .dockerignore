@@ -1,0 +1,15 @@
+pycache/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.git/
+.gitignore
+data/store_intelligence.db
+data/processed/
+tests/
+docs/
+*.mp4
+*.log
