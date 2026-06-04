@@ -122,7 +122,7 @@ def _signal_movement_frequency(
 def _signal_early_presence(track: TrackState) -> StaffSignal:
     """Signal 4: first seen in first 3 seconds of clip."""
     fired  = track.first_seen_frame <= STAFF_EARLY_FRAME
-    conf   = 0.55 if fired else 0.0
+    conf   = 0.40 if fired else 0.0
     detail = f"first_seen_frame={track.first_seen_frame} (threshold<={STAFF_EARLY_FRAME})"
     return StaffSignal("EARLY_PRESENCE", fired, conf, detail)
 

@@ -54,6 +54,7 @@ class TrackState:
     last_seen_frame: int
     first_seen_time: float           # wall-clock time (or frame-derived)
     centroid_history: deque          # deque of (cx_norm, cy_norm, frame_idx)
+    bbox_history: deque = field(default_factory=lambda: deque(maxlen=200))
     current_zone: Optional[str] = None
     zone_entry_frame: Optional[int] = None
     is_staff: Optional[bool] = None
@@ -73,6 +74,17 @@ class TrackState:
             cx, cy, _ = self.centroid_history[0]
             return cx, cy
         return None
+
+    @property
+    def aspect_ratio_history(self) -> list[float]:
+        """Compute aspect ratios from bbox_history. h/w for each box."""
+        ratios = []
+        for x1, y1, x2, y2, _ in self.bbox_history:
+            w = x2 - x1
+            h = y2 - y1
+            if w > 0:
+                ratios.append(h / w)
+        return ratios
 
 
 @dataclass
@@ -299,6 +311,7 @@ class PersonTracker:
                 track = self.active_tracks[track_id]
                 track.last_seen_frame = frame_idx
                 track.centroid_history.append((cx_norm, cy_norm, frame_idx))
+                track.bbox_history.append((x1, y1, x2, y2, frame_idx))
 
         # Mark tracks not seen this frame
         lost_ids = set(self.active_tracks.keys()) - seen_track_ids
