@@ -18,7 +18,9 @@ class EventType(str, Enum):
 class EventMetadata(BaseModel):
     queue_depth: Optional[int] = None
     sku_zone: Optional[str] = None
-    session_seq: int
+    session_seq: int = 1
+    direction: Optional[str] = None
+    reentry_count: Optional[int] = None
 
 class StoreEvent(BaseModel):
     event_id: str
