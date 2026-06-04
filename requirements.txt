@@ -15,3 +15,8 @@ python-dotenv
 opencv-python-headless
 pytesseract
 Pillow
+fastapi
+uvicorn
+aiosqlite
+sqlalchemy
+greenlet
