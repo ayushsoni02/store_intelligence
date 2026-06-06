@@ -1,4 +1,4 @@
-# Store Intelligence — Purplle Tech Challenge 2026
+# Store Intelligence
 
 Real-time retail analytics pipeline: raw CCTV footage →
 structured events → live store intelligence API.
