@@ -2,7 +2,7 @@
 .ai_history.log
 .env
 /scripts
-/.DS_Store
+.DS_Store
 /__pycache__
 /.venv
 .DS_Store

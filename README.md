@@ -6,7 +6,6 @@
 ![Docker](https://img.shields.io/badge/docker-supported-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> **Purplle Tech Challenge 2026**
 > A real-time retail analytics pipeline transforming raw CCTV footage into structured events and providing a live store intelligence API.
 
 ## Table of Contents
